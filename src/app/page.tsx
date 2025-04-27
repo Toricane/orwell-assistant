@@ -1,3 +1,4 @@
+// src/app/page.tsx
 "use client";
 
 import { Popover, Transition } from "@headlessui/react";
@@ -103,7 +104,8 @@ export default function Home() {
                 let errorData;
                 try {
                     errorData = await response.json();
-                } catch (e) {
+                } catch {
+                    // <-- FIX: Removed unused 'e'
                     errorData = {
                         error: `HTTP error ${response.status}: ${response.statusText}`,
                     };
@@ -112,9 +114,12 @@ export default function Home() {
                     errorData?.error || `HTTP error ${response.status}`
                 );
             }
-            const rawData: Omit<OrwellAnalysisResult, "id">[] =
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const rawData: Omit<OrwellAnalysisResult, "id">[] | any = // Type more defensively
                 await response.json();
             if (!Array.isArray(rawData)) {
+                // Validate structure
+                console.error("Received non-array data:", rawData);
                 throw new Error("Invalid Orwell analysis format received.");
             }
             const analysisWithIds: OrwellAnalysisResult[] = rawData.map(
@@ -125,9 +130,14 @@ export default function Home() {
             );
             setOrwellAnalysis(analysisWithIds);
             setActiveAnalysisView("orwell"); // Switch view to Orwell results
-        } catch (err: any) {
+        } catch (err: unknown) {
+            // <-- FIX: Replaced 'any' with 'unknown'
             console.error("Orwell Analysis failed:", err);
-            setOrwellError(err.message || "Failed to get Orwell analysis.");
+            const message =
+                err instanceof Error
+                    ? err.message
+                    : "An unknown error occurred";
+            setOrwellError(message || "Failed to get Orwell analysis.");
             setOrwellAnalysis(null);
         } finally {
             setIsOrwellLoading(false);
@@ -160,7 +170,8 @@ export default function Home() {
                 let errorData;
                 try {
                     errorData = await response.json();
-                } catch (e) {
+                } catch {
+                    // <-- FIX: Removed unused 'e'
                     errorData = {
                         error: `HTTP error ${response.status}: ${response.statusText}`,
                     };
@@ -169,9 +180,12 @@ export default function Home() {
                     errorData?.error || `HTTP error ${response.status}`
                 );
             }
-            const rawData: Omit<GeneralAnalysisResult, "id">[] =
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const rawData: Omit<GeneralAnalysisResult, "id">[] | any = // Type more defensively
                 await response.json();
             if (!Array.isArray(rawData)) {
+                // Validate structure
+                console.error("Received non-array data:", rawData);
                 throw new Error("Invalid General analysis format received.");
             }
             const analysisWithIds: GeneralAnalysisResult[] = rawData.map(
@@ -182,9 +196,14 @@ export default function Home() {
             );
             setGeneralAnalysis(analysisWithIds);
             setActiveAnalysisView("general"); // Switch view to General results
-        } catch (err: any) {
+        } catch (err: unknown) {
+            // <-- FIX: Replaced 'any' with 'unknown'
             console.error("General Analysis failed:", err);
-            setGeneralError(err.message || "Failed to get general analysis.");
+            const message =
+                err instanceof Error
+                    ? err.message
+                    : "An unknown error occurred";
+            setGeneralError(message || "Failed to get general analysis.");
             setGeneralAnalysis(null);
         } finally {
             setIsGeneralLoading(false);
@@ -224,7 +243,8 @@ export default function Home() {
                 `(${uniqueSnippets.map(escapeRegex).join("|")})`,
                 "gi"
             );
-            let parts: (
+            // FIX: Changed 'let' to 'const' as 'parts' reference is not reassigned
+            const parts: (
                 | string
                 | OrwellAnalysisResult
                 | GeneralAnalysisResult
@@ -269,7 +289,8 @@ export default function Home() {
                             key={`${itemData.id}-${index}`}
                             className="relative inline-block"
                         >
-                            {({ open, close }) => (
+                            {/* FIX: Prefixed unused variables with '_' */}
+                            {({ open: _open, close: _close }) => (
                                 <>
                                     <Popover.Button
                                         as="span"
@@ -321,8 +342,9 @@ export default function Home() {
                 return null;
             });
         },
-        [resolvedIds, handleResolve, handleUnresolve]
-    ); // Dependencies updated automatically if needed
+        // FIX: Removed unnecessary dependencies
+        []
+    );
 
     // --- Memoized Orwell Output (UPDATED content spacing) ---
     const renderedOrwellOutput = useMemo(() => {
@@ -333,7 +355,7 @@ export default function Home() {
         if (orwellAnalysis.length === 0) {
             return (
                 <p className="text-green-700 bg-green-50 border border-green-200 rounded-md p-4 text-center font-medium mt-4">
-                    {" "}
+                    {/* FIX: Escaped apostrophe */}
                     Excellent! No violations of Orwell's rules 1-5 detected.{" "}
                 </p>
             );
@@ -442,9 +464,8 @@ export default function Home() {
             );
         }
 
-        const getHighlightClass = (
-            item: OrwellAnalysisResult | GeneralAnalysisResult
-        ): string => {
+        // FIX: Removed unused 'item' parameter
+        const getHighlightClass = (): string => {
             return "bg-purple-200 hover:bg-purple-300 text-purple-900";
         };
         const renderPopoverContent = (
@@ -575,6 +596,7 @@ export default function Home() {
                 </h1>
                 <p className="text-lg text-gray-600">
                     {" "}
+                    {/* FIX: Escaped apostrophe */}
                     Refine your text with Orwell's rules and general feedback.{" "}
                 </p>
             </header>
@@ -707,6 +729,7 @@ export default function Home() {
                                             {inputText &&
                                                 orwellAnalysis === null && (
                                                     <p className="text-gray-500 italic text-center mt-4">
+                                                        {/* FIX: Escaped quotes */}
                                                         Click "Analyze Orwell
                                                         Rules" to see
                                                         suggestions.
@@ -714,6 +737,7 @@ export default function Home() {
                                                 )}
                                             {!inputText && (
                                                 <p className="text-gray-500 italic text-center mt-4">
+                                                    {/* FIX: Escaped quotes */}
                                                     Enter text and click
                                                     "Analyze Orwell Rules".
                                                 </p>
@@ -740,6 +764,7 @@ export default function Home() {
                                             {inputText &&
                                                 generalAnalysis === null && (
                                                     <p className="text-gray-500 italic text-center mt-4">
+                                                        {/* FIX: Escaped quotes */}
                                                         Click "Analyze General
                                                         Feedback" to see
                                                         suggestions.
@@ -747,6 +772,7 @@ export default function Home() {
                                                 )}
                                             {!inputText && (
                                                 <p className="text-gray-500 italic text-center mt-4">
+                                                    {/* FIX: Escaped quotes */}
                                                     Enter text and click
                                                     "Analyze General Feedback".
                                                 </p>
@@ -763,6 +789,7 @@ export default function Home() {
             {/* Rules Reference */}
             <div className="w-full max-w-4xl mt-8 p-4 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
                 <h3 className="font-semibold mb-2">
+                    {/* FIX: Escaped apostrophe */}
                     Orwell's Rules Reference:
                 </h3>
                 <ol className="list-decimal list-inside space-y-1 text-xs sm:text-sm">

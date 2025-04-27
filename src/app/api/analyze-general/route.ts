@@ -73,8 +73,10 @@ function extractJson(text: string): GeneralAnalysisResult[] | null {
             parsed
         );
         return null;
-    } catch (error: any) {
-        console.error(`Error parsing JSON string (General): ${error.message}`);
+    } catch (error: unknown) {
+        // <-- FIX: Replaced 'any' with 'unknown'
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`Error parsing JSON string (General): ${message}`);
         console.error("String that failed parsing (General):", jsonString);
         return null;
     }
@@ -182,6 +184,7 @@ JSON Response:
 
         // --- Reusable Error Handling ---
         if (!result.response) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             const promptFeedback = result?.promptFeedback;
             if (promptFeedback?.blockReason) {
                 console.error(
@@ -278,16 +281,19 @@ JSON Response:
 
         console.log("Successfully parsed general analysis data.");
         return NextResponse.json(analysisData);
-    } catch (error: any) {
+    } catch (error: unknown) {
+        // <-- FIX: Replaced 'any' with 'unknown'
         console.error("Error in /api/analyze-general:", error);
-        if (
-            error.message &&
-            (error.message.includes("SAFETY") || error.status === 400)
-        ) {
+        const message = error instanceof Error ? error.message : String(error);
+        // Attempt to check for safety-related properties if the error object might have them
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const errorStatus = (error as any)?.status;
+
+        if (message && (message.includes("SAFETY") || errorStatus === 400)) {
             return NextResponse.json(
                 {
                     error: "Request failed, potentially due to safety filters or invalid input.",
-                    details: error.message,
+                    details: message,
                 },
                 { status: 400 }
             );
@@ -295,7 +301,7 @@ JSON Response:
         return NextResponse.json(
             {
                 error: "An unexpected error occurred on the server.",
-                details: error.message,
+                details: message,
             },
             { status: 500 }
         );

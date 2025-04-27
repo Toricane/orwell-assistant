@@ -1,46 +1,60 @@
 // src/app/api/analyze/route.ts
 import {
     FinishReason,
-    GenerateContentRequest,
-    GoogleGenerativeAI,
+    // Import necessary types and classes from the new SDK
+    GoogleGenAI,
     HarmBlockThreshold,
     HarmCategory,
-} from "@google/generative-ai";
+} from "@google/genai"; // Changed import path
 import { NextRequest, NextResponse } from "next/server";
 
-// Define the expected structure for analysis results
+// Define the expected structure for GENERAL analysis results (remains the same)
+// RENAME if this route handles DIFFERENT analysis types
 interface AnalysisResult {
+    // Renamed for clarity if different from general
     snippet: string; // The exact text snippet identified
-    rule: number; // The rule number (1-5)
-    suggestion: string; // The explanation or suggestion
+    category: string; // Type of feedback (e.g., Clarity, Conciseness, Engagement, Grammar, Tone)
+    feedback: string; // The explanation or suggestion
 }
 
-const MODEL_NAME = "models/gemini-1.5-flash-latest"; // Explicitly use the requested model
-const API_KEY = process.env.GEMINI_API_KEY || "";
-
-// --- Helper Function to Extract JSON ---
-// (Keep the robust extractJson function from the previous step)
+// --- Reusable JSON Extractor ---
+// (This function is SDK-independent and remains unchanged, adjust logs if needed)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function extractJson(text: string): AnalysisResult[] | null {
-    console.log("Attempting to extract JSON from raw text:", text); // Log raw input
+    console.log("Attempting to extract JSON from raw text (Analyze):", text); // Adjusted log context
     const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
     let jsonString = "";
     if (jsonMatch && jsonMatch[1]) {
         jsonString = jsonMatch[1].trim();
-        console.log("Extracted content from markdown fences:", jsonString);
+        console.log(
+            "Extracted content from markdown fences (Analyze):", // Adjusted log context
+            jsonString
+        );
     } else {
         console.log(
-            "No JSON markdown fences detected. Assuming raw text might be JSON."
+            "No JSON markdown fences detected (Analyze). Assuming raw text might be JSON." // Adjusted log context
         );
         jsonString = text.trim();
     }
+
     if (!jsonString) {
-        console.error("JSON string is empty after extraction/trimming.");
+        console.error(
+            "JSON string is empty after extraction/trimming (Analyze)." // Adjusted log context
+        );
         return null;
     }
+
+    // Attempt to clean trailing commas before closing braces/brackets
     jsonString = jsonString.replace(/,\s*([}\]])/g, "$1");
+
     try {
-        console.log("Attempting to parse cleaned JSON string:", jsonString);
+        console.log(
+            "Attempting to parse cleaned JSON string (Analyze):", // Adjusted log context
+            jsonString
+        );
         const parsed = JSON.parse(jsonString);
+
+        // Validate the structure (using renamed interface if applicable)
         if (
             Array.isArray(parsed) &&
             (parsed.length === 0 ||
@@ -48,27 +62,31 @@ function extractJson(text: string): AnalysisResult[] | null {
                     (item) =>
                         item &&
                         typeof item.snippet === "string" &&
-                        typeof item.rule === "number" &&
-                        typeof item.suggestion === "string"
+                        typeof item.category === "string" &&
+                        typeof item.feedback === "string"
                 ))
         ) {
-            console.log("Successfully parsed JSON and validated structure.");
+            console.log(
+                "Successfully parsed JSON and validated structure (Analyze)." // Adjusted log context
+            );
             return parsed as AnalysisResult[];
         }
         console.warn(
-            "Parsed data is not a valid AnalysisResult[] array:",
+            "Parsed data is not a valid AnalysisResult[] array (Analyze):", // Adjusted log context
             parsed
         );
         return null;
     } catch (error: unknown) {
-        // <-- FIX: Replaced 'any' with 'unknown'
         const message = error instanceof Error ? error.message : String(error);
-        console.error(`Error parsing JSON string: ${message}`);
-        console.error("String that failed parsing:", jsonString);
+        console.error(`Error parsing JSON string (Analyze): ${message}`); // Adjusted log context
+        console.error("String that failed parsing (Analyze):", jsonString); // Adjusted log context
         return null;
     }
 }
-// --- End Helper Function ---
+// --- End Reusable JSON Extractor ---
+
+const MODEL_NAME = "models/gemini-2.5-flash-preview-04-17";
+const API_KEY = process.env.GEMINI_API_KEY || "";
 
 export async function POST(request: NextRequest) {
     if (!API_KEY) {
@@ -78,6 +96,9 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         );
     }
+
+    // Initialize the client using the new SDK
+    const genAI = new GoogleGenAI({ apiKey: API_KEY });
 
     try {
         const { text } = await request.json();
@@ -89,38 +110,31 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const genAI = new GoogleGenerativeAI(API_KEY);
-        const model = genAI.getGenerativeModel({ model: MODEL_NAME });
-
-        // --- Updated Generation Config ---
-        // Removed maxOutputTokens to prevent premature truncation
-        const generationConfig = {
-            temperature: 0.3, // Keep lower temperature for focused output
+        // Define configuration options - flatten generationConfig and include safetySettings
+        const config = {
+            temperature: 0.5,
             topK: 1,
             topP: 1,
-            // maxOutputTokens: 4096, // REMOVED THIS LINE
+            safetySettings: [
+                {
+                    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+                    threshold: HarmBlockThreshold.BLOCK_NONE,
+                },
+                {
+                    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                    threshold: HarmBlockThreshold.BLOCK_NONE,
+                },
+                {
+                    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                    threshold: HarmBlockThreshold.BLOCK_NONE,
+                },
+                {
+                    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                    threshold: HarmBlockThreshold.BLOCK_NONE,
+                },
+            ],
+            responseMimeType: "application/json",
         };
-        // --- End Updated Generation Config ---
-
-        // Safety settings remain disabled for now, as per previous step
-        const safetySettings = [
-            {
-                category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-            {
-                category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-            {
-                category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-            {
-                category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-        ];
 
         const orwellRules = `
 George Orwell's 6 Rules for Writing:
@@ -163,24 +177,25 @@ ${text}
 JSON Response:
 `;
 
-        const req: GenerateContentRequest = {
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig, // Use the updated config without maxOutputTokens
-            safetySettings,
-        };
+        const contents = [{ role: "user", parts: [{ text: prompt }] }];
 
-        console.log(
-            "Sending request to Gemini (no explicit maxOutputTokens)..."
-        );
-        const result = await model.generateContent(req);
+        console.log("Sending request to Gemini (new SDK) for Analysis..."); // Adjusted log context
 
-        // --- Keep the enhanced error checking from the previous step ---
-        if (!result.response) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        // Call generateContent using the client's model access
+        const result = await genAI.models.generateContent({
+            model: MODEL_NAME,
+            contents: contents,
+            config: config,
+        });
+
+        // --- Reusable Error Handling ---
+        const response = result;
+
+        if (response.promptFeedback) {
             const promptFeedback = result?.promptFeedback;
             if (promptFeedback?.blockReason) {
                 console.error(
-                    `Prompt was blocked: ${promptFeedback.blockReason}`,
+                    `Prompt was blocked (Analyze): ${promptFeedback.blockReason}`, // Adjusted log context
                     promptFeedback.safetyRatings
                 );
                 return NextResponse.json(
@@ -192,7 +207,7 @@ JSON Response:
                 );
             }
             console.error(
-                "Gemini response object was undefined or null. Full result object:",
+                "Gemini response object was undefined or null (Analyze). Full result object:", // Adjusted log context
                 result
             );
             return NextResponse.json(
@@ -201,15 +216,15 @@ JSON Response:
             );
         }
 
-        const candidate = result.response.candidates?.[0];
+        const candidate = response.candidates?.[0];
         const finishReason = candidate?.finishReason;
         const safetyRatings = candidate?.safetyRatings;
 
         if (finishReason === FinishReason.SAFETY) {
             console.error(
-                "Gemini response generation was stopped due to SAFETY finish reason."
+                "Gemini response generation was stopped due to SAFETY finish reason (Analyze)." // Adjusted log context
             );
-            console.error("Safety Ratings:", safetyRatings);
+            console.error("Safety Ratings (Analyze):", safetyRatings); // Adjusted log context
             return NextResponse.json(
                 {
                     error: "Analysis response blocked by safety filters.",
@@ -223,17 +238,16 @@ JSON Response:
             finishReason !== FinishReason.STOP &&
             finishReason !== FinishReason.MAX_TOKENS
         ) {
-            // Note: We *might* still see MAX_TOKENS if the model's *internal* limit is hit, but it's less likely now.
             console.warn(
-                `Gemini response finished with unexpected reason: ${finishReason}`
+                `Gemini response finished with unexpected reason (Analyze): ${finishReason}` // Adjusted log context
             );
         }
 
-        const responseText = result.response.text();
+        const responseText = response.text;
 
         if (!responseText) {
             console.error(
-                "Gemini response text content is empty. Finish Reason:",
+                "Gemini response text content is empty (Analyze). Finish Reason:", // Adjusted log context
                 finishReason,
                 "Safety Ratings:",
                 safetyRatings
@@ -242,20 +256,28 @@ JSON Response:
             if (finishReason && finishReason !== FinishReason.STOP) {
                 errorMessage += ` (Finish Reason: ${finishReason})`;
             }
-            // Add the MAX_TOKENS specific message back, just in case the *internal* limit is hit.
             if (finishReason === FinishReason.MAX_TOKENS) {
                 errorMessage +=
                     " (The response may have been truncated due to the model's internal length limits.)";
             }
-            if (result.response.usageMetadata) {
-                console.log("Usage Metadata:", result.response.usageMetadata);
+            if (response.usageMetadata) {
+                console.log(
+                    "Usage Metadata (Analyze):", // Adjusted log context
+                    response.usageMetadata
+                );
             }
             return NextResponse.json({ error: errorMessage }, { status: 500 });
         }
+        // --- End Reusable Error Handling ---
 
-        const analysisData = extractJson(responseText);
+        // const analysisData = extractJson(responseText);
+        const analysisData = JSON.parse(responseText);
 
         if (analysisData === null) {
+            console.error(
+                "Failed to parse valid JSON analysis from AI response (Analyze). Raw response:", // Adjusted log context
+                responseText
+            );
             return NextResponse.json(
                 {
                     error: "Failed to parse valid JSON analysis from AI response.",
@@ -265,17 +287,21 @@ JSON Response:
             );
         }
 
-        console.log("Successfully parsed analysis data.");
+        console.log("Successfully parsed analysis data."); // Adjusted log context
         return NextResponse.json(analysisData);
     } catch (error: unknown) {
-        // <-- FIX: Replaced 'any' with 'unknown'
-        console.error("Error in /api/analyze:", error);
+        console.error("Error in /api/analyze:", error); // Adjusted log context
         const message = error instanceof Error ? error.message : String(error);
-        // Attempt to check for safety-related properties if the error object might have them
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const errorStatus = (error as any)?.status;
 
-        if (message && (message.includes("SAFETY") || errorStatus === 400)) {
+        if (
+            message &&
+            (message.includes("SAFETY") ||
+                errorStatus === 400 ||
+                message.includes("filtered") ||
+                message.includes("blocked"))
+        ) {
             return NextResponse.json(
                 {
                     error: "Request failed, potentially due to safety filters or invalid input.",

@@ -1,14 +1,14 @@
 // src/app/api/analyze-general/route.ts
 import {
     FinishReason,
-    GenerateContentRequest,
-    GoogleGenerativeAI,
+    // Import necessary types and classes from the new SDK
+    GoogleGenAI,
     HarmBlockThreshold,
     HarmCategory,
-} from "@google/generative-ai";
+} from "@google/genai"; // Changed import path
 import { NextRequest, NextResponse } from "next/server";
 
-// Define the expected structure for GENERAL analysis results
+// Define the expected structure for GENERAL analysis results (remains the same)
 interface GeneralAnalysisResult {
     snippet: string; // The exact text snippet identified
     category: string; // Type of feedback (e.g., Clarity, Conciseness, Engagement, Grammar, Tone)
@@ -16,7 +16,8 @@ interface GeneralAnalysisResult {
 }
 
 // --- Reusable JSON Extractor ---
-// (Same robust function as in the analyze route)
+// (This function is SDK-independent and remains unchanged)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function extractJson(text: string): GeneralAnalysisResult[] | null {
     console.log("Attempting to extract JSON from raw text (General):", text);
     const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
@@ -74,7 +75,6 @@ function extractJson(text: string): GeneralAnalysisResult[] | null {
         );
         return null;
     } catch (error: unknown) {
-        // <-- FIX: Replaced 'any' with 'unknown'
         const message = error instanceof Error ? error.message : String(error);
         console.error(`Error parsing JSON string (General): ${message}`);
         console.error("String that failed parsing (General):", jsonString);
@@ -83,7 +83,10 @@ function extractJson(text: string): GeneralAnalysisResult[] | null {
 }
 // --- End Reusable JSON Extractor ---
 
-const MODEL_NAME = "models/gemini-1.5-flash-latest"; // Or your preferred model like 'models/gemini-1.5-pro-latest'
+// Use a model compatible with the new SDK/features if desired, or keep existing
+// The migration guide often shows newer models like 'gemini-2.0-flash'
+// Stick with the original unless there's a specific reason to upgrade model family
+const MODEL_NAME = "models/gemini-2.5-flash-preview-04-17";
 const API_KEY = process.env.GEMINI_API_KEY || "";
 
 export async function POST(request: NextRequest) {
@@ -95,6 +98,9 @@ export async function POST(request: NextRequest) {
         );
     }
 
+    // Initialize the client using the new SDK
+    const genAI = new GoogleGenAI({ apiKey: API_KEY });
+
     try {
         const { text } = await request.json();
 
@@ -105,35 +111,41 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const genAI = new GoogleGenerativeAI(API_KEY);
-        const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+        // Note: We don't get a separate 'model' object first in the new pattern.
+        // We pass the model name directly to the generateContent call.
 
-        const generationConfig = {
-            temperature: 0.5, // Slightly higher temp for more varied feedback
+        // Define configuration options - flatten generationConfig and include safetySettings
+        const config = {
+            // Flattened generation config parameters
+            temperature: 0.5,
             topK: 1,
             topP: 1,
-            // No maxOutputTokens - let the model decide or hit internal limits
-        };
+            // maxOutputTokens: undefined, // Let model decide unless needed
 
-        // Keep safety settings consistent (or adjust if needed for general feedback)
-        const safetySettings = [
-            {
-                category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-            {
-                category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-            {
-                category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-            {
-                category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-        ];
+            // Safety settings nested within config
+            safetySettings: [
+                {
+                    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+                    threshold: HarmBlockThreshold.BLOCK_NONE,
+                },
+                {
+                    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                    threshold: HarmBlockThreshold.BLOCK_NONE,
+                },
+                {
+                    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                    threshold: HarmBlockThreshold.BLOCK_NONE,
+                },
+                {
+                    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                    threshold: HarmBlockThreshold.BLOCK_NONE,
+                },
+            ],
+
+            // If needed for JSON mode (not used in this specific prompt, but example):
+            responseMimeType: "application/json",
+            // responseSchema: GeneralAnalysisResult, // Or a more specific schema type
+        };
 
         // --- Prompt for General Analysis ---
         const prompt = `
@@ -173,19 +185,27 @@ JSON Response:
 `;
         // --- End Prompt ---
 
-        const req: GenerateContentRequest = {
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig,
-            safetySettings,
-        };
+        // Define contents (remains the same structure)
+        const contents = [{ role: "user", parts: [{ text: prompt }] }];
 
-        console.log("Sending request to Gemini for General Analysis...");
-        const result = await model.generateContent(req);
+        console.log(
+            "Sending request to Gemini (new SDK) for General Analysis..."
+        );
 
-        // --- Reusable Error Handling ---
-        if (!result.response) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            const promptFeedback = result?.promptFeedback;
+        // Call generateContent using the client's model access
+        // Pass model, contents, and config
+        const result = await genAI.models.generateContent({
+            model: MODEL_NAME,
+            contents: contents,
+            config: config,
+        });
+
+        // --- Reusable Error Handling (adapted for potentially slightly different response structure if needed) ---
+        // Assuming the core structure of response, candidates, promptFeedback remains similar enough
+        const response = result; // Access the response object directly
+
+        if (response.promptFeedback) {
+            const promptFeedback = result?.promptFeedback; // Access promptFeedback potentially directly on result
             if (promptFeedback?.blockReason) {
                 console.error(
                     `Prompt was blocked (General): ${promptFeedback.blockReason}`,
@@ -209,7 +229,8 @@ JSON Response:
             );
         }
 
-        const candidate = result.response.candidates?.[0];
+        const candidate = response.candidates?.[0];
+        // Access finishReason and safetyRatings from the candidate
         const finishReason = candidate?.finishReason;
         const safetyRatings = candidate?.safetyRatings;
 
@@ -236,7 +257,7 @@ JSON Response:
             );
         }
 
-        const responseText = result.response.text();
+        const responseText = response.text;
 
         if (!responseText) {
             console.error(
@@ -253,17 +274,19 @@ JSON Response:
                 errorMessage +=
                     " (The response may have been truncated due to the model's internal length limits.)";
             }
-            if (result.response.usageMetadata) {
+            // UsageMetadata might be nested differently, check SDK docs if needed
+            if (response.usageMetadata) {
                 console.log(
                     "Usage Metadata (General):",
-                    result.response.usageMetadata
+                    response.usageMetadata
                 );
             }
             return NextResponse.json({ error: errorMessage }, { status: 500 });
         }
         // --- End Reusable Error Handling ---
 
-        const analysisData = extractJson(responseText);
+        // const analysisData = extractJson(responseText);
+        const analysisData = JSON.parse(responseText);
 
         if (analysisData === null) {
             console.error(
@@ -282,14 +305,18 @@ JSON Response:
         console.log("Successfully parsed general analysis data.");
         return NextResponse.json(analysisData);
     } catch (error: unknown) {
-        // <-- FIX: Replaced 'any' with 'unknown'
         console.error("Error in /api/analyze-general:", error);
         const message = error instanceof Error ? error.message : String(error);
-        // Attempt to check for safety-related properties if the error object might have them
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const errorStatus = (error as any)?.status;
+        const errorStatus = (error as any)?.status; // Keep checking for status code if available
 
-        if (message && (message.includes("SAFETY") || errorStatus === 400)) {
+        if (
+            message &&
+            (message.includes("SAFETY") ||
+                errorStatus === 400 ||
+                message.includes("filtered") ||
+                message.includes("blocked"))
+        ) {
             return NextResponse.json(
                 {
                     error: "Request failed, potentially due to safety filters or invalid input.",

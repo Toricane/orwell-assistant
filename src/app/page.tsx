@@ -1,10 +1,15 @@
 // src/app/page.tsx
 "use client";
 
-import { Popover, Transition } from "@headlessui/react";
+import {
+    Popover,
+    PopoverButton,
+    PopoverPanel,
+    Transition,
+} from "@headlessui/react";
 import { Fragment, useCallback, useMemo, useState } from "react";
 
-// --- Interfaces (Keep as before) ---
+// --- Interfaces ---
 interface OrwellAnalysisResult {
     snippet: string;
     rule: number;
@@ -22,12 +27,12 @@ interface GeneralAnalysisResult {
 
 type AnalysisView = "orwell" | "general"; // Type for the active view state
 
-// Helper function to escape regex special characters (keep)
+// Helper function to escape regex special characters
 function escapeRegex(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Helper for Orwell rule descriptions (keep)
+// Helper for Orwell rule descriptions
 const ruleDescriptions: { [key: number]: string } = {
     1: "Avoid Clichés",
     2: "Prefer Short Words",
@@ -56,12 +61,11 @@ export default function Home() {
     // Resolved Feedback State
     const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
 
-    // --- NEW: State for Active Analysis View ---
+    // State for Active Analysis View
     const [activeAnalysisView, setActiveAnalysisView] =
         useState<AnalysisView>("orwell"); // Default to Orwell view
-    // --- End Active View State ---
 
-    // Resolve/Unresolve Handlers (Keep as before)
+    // Resolve/Unresolve Handlers
     const handleResolve = useCallback((id: string) => {
         setResolvedIds((prev) => {
             const newSet = new Set(prev);
@@ -77,12 +81,12 @@ export default function Home() {
         });
     }, []);
 
-    // --- Analysis Handlers (Update to set active view) ---
+    // Analysis Handlers
     const handleOrwellAnalyze = useCallback(async () => {
         if (!inputText.trim()) {
             setOrwellError("Please paste some text to analyze.");
             setOrwellAnalysis(null);
-            setGeneralAnalysis(null);
+            setGeneralAnalysis(null); // Clear other analysis
             setGeneralError(null);
             setResolvedIds(new Set());
             return;
@@ -91,7 +95,7 @@ export default function Home() {
         setOrwellError(null);
         setOrwellAnalysis(null);
         setResolvedIds(new Set());
-        // Optionally clear general analysis too
+        // Optionally clear general analysis too if desired, but setting the view handles display
         // setGeneralAnalysis(null); setGeneralError(null);
 
         try {
@@ -105,7 +109,6 @@ export default function Home() {
                 try {
                     errorData = await response.json();
                 } catch {
-                    // <-- FIX: Removed unused 'e'
                     errorData = {
                         error: `HTTP error ${response.status}: ${response.statusText}`,
                     };
@@ -115,10 +118,9 @@ export default function Home() {
                 );
             }
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const rawData: Omit<OrwellAnalysisResult, "id">[] | any = // Type more defensively
+            const rawData: Omit<OrwellAnalysisResult, "id">[] | any =
                 await response.json();
             if (!Array.isArray(rawData)) {
-                // Validate structure
                 console.error("Received non-array data:", rawData);
                 throw new Error("Invalid Orwell analysis format received.");
             }
@@ -131,7 +133,6 @@ export default function Home() {
             setOrwellAnalysis(analysisWithIds);
             setActiveAnalysisView("orwell"); // Switch view to Orwell results
         } catch (err: unknown) {
-            // <-- FIX: Replaced 'any' with 'unknown'
             console.error("Orwell Analysis failed:", err);
             const message =
                 err instanceof Error
@@ -148,7 +149,7 @@ export default function Home() {
         if (!inputText.trim()) {
             setGeneralError("Please paste some text to analyze.");
             setGeneralAnalysis(null);
-            setOrwellAnalysis(null);
+            setOrwellAnalysis(null); // Clear other analysis
             setOrwellError(null);
             setResolvedIds(new Set());
             return;
@@ -157,7 +158,7 @@ export default function Home() {
         setGeneralError(null);
         setGeneralAnalysis(null);
         setResolvedIds(new Set());
-        // Optionally clear Orwell analysis too
+        // Optionally clear Orwell analysis too if desired
         // setOrwellAnalysis(null); setOrwellError(null);
 
         try {
@@ -171,7 +172,6 @@ export default function Home() {
                 try {
                     errorData = await response.json();
                 } catch {
-                    // <-- FIX: Removed unused 'e'
                     errorData = {
                         error: `HTTP error ${response.status}: ${response.statusText}`,
                     };
@@ -181,10 +181,9 @@ export default function Home() {
                 );
             }
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const rawData: Omit<GeneralAnalysisResult, "id">[] | any = // Type more defensively
+            const rawData: Omit<GeneralAnalysisResult, "id">[] | any =
                 await response.json();
             if (!Array.isArray(rawData)) {
-                // Validate structure
                 console.error("Received non-array data:", rawData);
                 throw new Error("Invalid General analysis format received.");
             }
@@ -197,7 +196,6 @@ export default function Home() {
             setGeneralAnalysis(analysisWithIds);
             setActiveAnalysisView("general"); // Switch view to General results
         } catch (err: unknown) {
-            // <-- FIX: Replaced 'any' with 'unknown'
             console.error("General Analysis failed:", err);
             const message =
                 err instanceof Error
@@ -211,7 +209,7 @@ export default function Home() {
     }, [inputText]);
     // --- End Analysis Handlers ---
 
-    // --- Render Highlighted Text Function (UPDATED Popover.Panel styles) ---
+    // --- Render Highlighted Text Function (UPDATED FOR POPOVER FIX) ---
     const renderHighlightedText = useCallback(
         (
             textToRender: string,
@@ -219,31 +217,34 @@ export default function Home() {
                 | (OrwellAnalysisResult | GeneralAnalysisResult)[]
                 | null,
             currentResolvedIds: Set<string>,
-            onResolve: (id: string) => void,
-            onUnresolve: (id: string) => void,
+            onResolve: (id: string) => void, // Original handlers
+            onUnresolve: (id: string) => void, // Original handlers
             getHighlightClass: (
                 item: OrwellAnalysisResult | GeneralAnalysisResult
             ) => string,
+            // Updated signature: handlers now expect the close function to be passed in
             renderPopoverContentFn: (
                 item: OrwellAnalysisResult | GeneralAnalysisResult,
                 isResolved: boolean,
-                resolveHandler: (id: string) => void,
-                unresolveHandler: (id: string) => void
+                resolveHandlerWithClose: (id: string) => void, // Renamed for clarity
+                unresolveHandlerWithClose: (id: string) => void // Renamed for clarity
             ) => React.ReactNode
         ) => {
             if (!analysisData || !textToRender || analysisData.length === 0) {
-                return <span>{textToRender}</span>;
+                // Use a key for list rendering consistency
+                return <span key="full-text-empty">{textToRender}</span>;
             }
             const uniqueSnippets = [
                 ...new Set(analysisData.map((a) => a.snippet)),
             ];
             uniqueSnippets.sort((a, b) => b.length - a.length);
-            if (uniqueSnippets.length === 0) return <span>{textToRender}</span>;
+            if (uniqueSnippets.length === 0)
+                return <span key="full-text-no-snippets">{textToRender}</span>;
+
             const regex = new RegExp(
                 `(${uniqueSnippets.map(escapeRegex).join("|")})`,
                 "gi"
             );
-            // FIX: Changed 'let' to 'const' as 'parts' reference is not reassigned
             const parts: (
                 | string
                 | OrwellAnalysisResult
@@ -251,6 +252,7 @@ export default function Home() {
             )[] = [];
             let lastIndex = 0;
             let match;
+
             while ((match = regex.exec(textToRender)) !== null) {
                 if (match.index > lastIndex) {
                     parts.push(textToRender.substring(lastIndex, match.index));
@@ -260,8 +262,15 @@ export default function Home() {
                     (a) => a.snippet.toLowerCase() === matchedText.toLowerCase()
                 );
                 if (suggestionData) {
-                    parts.push({ ...suggestionData, snippet: matchedText });
+                    // Preserve original text casing if possible, otherwise use analysis casing
+                    const displaySnippet =
+                        suggestionData.snippet.toLowerCase() ===
+                        matchedText.toLowerCase()
+                            ? matchedText
+                            : suggestionData.snippet;
+                    parts.push({ ...suggestionData, snippet: displaySnippet });
                 } else {
+                    // Fallback if somehow a match doesn't correspond to analysis data (shouldn't happen)
                     parts.push(matchedText);
                 }
                 lastIndex = regex.lastIndex;
@@ -269,8 +278,15 @@ export default function Home() {
             if (lastIndex < textToRender.length) {
                 parts.push(textToRender.substring(lastIndex));
             }
-            const resolvedClass =
-                "border border-dashed border-gray-400 mx-px rounded-md cursor-pointer text-gray-600 hover:border-gray-600 focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-500"; // Removed px-1 for resolved
+
+            // Base styles to make a <button> look like inline text and behave correctly
+            const baseButtonResetStyles =
+                "appearance-none align-baseline inline font-inherit text-inherit bg-transparent p-0 m-0 border-none focus:outline-none focus-visible:ring-0 focus-visible:outline-none";
+
+            // Define resolved styles (applied to inner span)
+            const resolvedClassInner =
+                "border border-dashed border-gray-400 text-gray-600 group-hover:border-gray-600";
+            const resolvedClassButton = "cursor-pointer group"; // Group needed for hover effect on inner span
 
             return parts.map((part, index) => {
                 if (typeof part === "object" && part !== null && "id" in part) {
@@ -278,28 +294,43 @@ export default function Home() {
                         | OrwellAnalysisResult
                         | GeneralAnalysisResult;
                     const isResolved = currentResolvedIds.has(itemData.id);
-                    const buttonClass = isResolved
-                        ? resolvedClass
-                        : `${getHighlightClass(
-                              itemData
-                          )} px-1 mx-px rounded-md transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-opacity-75 cursor-pointer`;
+
+                    let buttonContainerClass = "";
+                    let innerSpanClass = "";
+
+                    if (isResolved) {
+                        // Resolved: Button is simple group, inner span gets dashed border
+                        buttonContainerClass = `${baseButtonResetStyles} ${resolvedClassButton}`;
+                        innerSpanClass = `${resolvedClassInner} rounded-md mx-px`; // Add back mx-px here
+                    } else {
+                        // Not Resolved: Button is base reset + cursor, inner span gets highlight/focus styles
+                        buttonContainerClass = `${baseButtonResetStyles} cursor-pointer`;
+                        innerSpanClass = `${getHighlightClass(
+                            itemData
+                        )} px-1 mx-px rounded-md transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-indigo-500 focus-visible:ring-opacity-75`; // Added focus-visible:ring-offset-1
+                    }
 
                     return (
                         <Popover
                             key={`${itemData.id}-${index}`}
-                            className="relative inline-block"
+                            className="relative inline-block align-baseline" // align-baseline helps keep button inline with text
                         >
-                            {() => (
+                            {(
+                                { open, close } // Destructure 'open' and 'close'
+                            ) => (
                                 <>
-                                    <Popover.Button
-                                        as="span"
-                                        className={buttonClass}
+                                    {/* Use default button, apply reset styles */}
+                                    <PopoverButton
+                                        className={buttonContainerClass}
                                     >
-                                        {" "}
-                                        {itemData.snippet}{" "}
-                                    </Popover.Button>
+                                        {/* Inner span holds the text and visual styles */}
+                                        <span className={innerSpanClass}>
+                                            {itemData.snippet}
+                                        </span>
+                                    </PopoverButton>
                                     <Transition
                                         as={Fragment}
+                                        show={open} // Control visibility with 'open' state
                                         enter="transition ease-out duration-200"
                                         enterFrom="opacity-0 translate-y-1"
                                         enterTo="opacity-100 translate-y-0"
@@ -307,55 +338,56 @@ export default function Home() {
                                         leaveFrom="opacity-100 translate-y-0"
                                         leaveTo="opacity-0 translate-y-1"
                                     >
-                                        {/* --- POPOVER PANEL STYLES UPDATED --- */}
-                                        <Popover.Panel className="absolute z-20 w-80 max-w-md px-4 mt-2 transform -translate-x-1/2 left-1/2 sm:px-0 lg:max-w-lg">
+                                        {/* Static rendering can sometimes help with complex focus/transition management */}
+                                        <PopoverPanel
+                                            static
+                                            className="absolute z-20 w-80 max-w-md px-4 mt-2 transform -translate-x-1/2 left-1/2 sm:px-0 lg:max-w-lg"
+                                        >
                                             <div className="overflow-hidden rounded-lg shadow-lg ring-1 ring-black ring-opacity-5">
-                                                {/* --- INNER PADDING REDUCED --- */}
                                                 <div className="relative bg-white p-3">
+                                                    {/* Pass handlers that NOW incorporate the 'close' function */}
                                                     {renderPopoverContentFn(
                                                         itemData,
                                                         isResolved,
+                                                        // Handler for resolving: calls original + close
                                                         (id) => {
-                                                            onResolve(
-                                                                id
-                                                            ); /* close(); */
+                                                            onResolve(id);
+                                                            close();
                                                         },
+                                                        // Handler for unresolving: calls original + close
                                                         (id) => {
-                                                            onUnresolve(
-                                                                id
-                                                            ); /* close(); */
+                                                            onUnresolve(id);
+                                                            close();
                                                         }
                                                     )}
                                                 </div>
                                             </div>
-                                        </Popover.Panel>
-                                        {/* --- END POPOVER PANEL STYLE UPDATES --- */}
+                                        </PopoverPanel>
                                     </Transition>
                                 </>
                             )}
                         </Popover>
                     );
                 } else if (typeof part === "string") {
+                    // Wrap text parts in span with key for stability
                     return <span key={`text-${index}`}>{part}</span>;
                 }
-                return null;
+                return null; // Should not happen
             });
         },
-        // FIX: Removed unnecessary dependencies
-        []
+        // Dependencies: Original resolve/unresolve handlers are stable via useCallback([])
+        [handleResolve, handleUnresolve]
     );
 
-    // --- Memoized Orwell Output (UPDATED content spacing) ---
+    // --- Memoized Orwell Output (UPDATED TO PASS HANDLERS WITH CLOSE) ---
     const renderedOrwellOutput = useMemo(() => {
-        if (!inputText && !orwellAnalysis) {
-            return null;
-        } // Handled by conditional render later
-        if (!orwellAnalysis) return null; // Handled by conditional render later
+        if (!inputText && !orwellAnalysis) return null;
+        if (!orwellAnalysis) return null;
         if (orwellAnalysis.length === 0) {
             return (
                 <p className="text-green-700 bg-green-50 border border-green-200 rounded-md p-4 text-center font-medium mt-4">
                     Excellent! No violations of Orwell&apos;s rules 1-5
-                    detected.{" "}
+                    detected.
                 </p>
             );
         }
@@ -364,7 +396,7 @@ export default function Home() {
             item: OrwellAnalysisResult | GeneralAnalysisResult
         ): string => {
             const data = item as OrwellAnalysisResult;
-            let className = "bg-yellow-200 hover:bg-yellow-300 text-yellow-900";
+            let className = "bg-yellow-200 hover:bg-yellow-300 text-yellow-900"; // Rule 3 Default
             if (data.rule === 1)
                 className = "bg-blue-200 hover:bg-blue-300 text-blue-900";
             if (data.rule === 2)
@@ -375,11 +407,14 @@ export default function Home() {
                 className = "bg-orange-200 hover:bg-orange-300 text-orange-900";
             return className;
         };
+
+        // This function defines the content INSIDE the popover panel
         const renderPopoverContent = (
             item: OrwellAnalysisResult | GeneralAnalysisResult,
             isResolved: boolean,
-            resolveHandler: (id: string) => void,
-            unresolveHandler: (id: string) => void
+            // These handlers are the ones created inside renderHighlightedText, they already include close()
+            resolveHandlerWithClose: (id: string) => void,
+            unresolveHandlerWithClose: (id: string) => void
         ): React.ReactNode => {
             const data = item as OrwellAnalysisResult;
             const ruleColorClasses: { [key: number]: string } = {
@@ -391,140 +426,143 @@ export default function Home() {
             };
             return (
                 <>
-                    {/* --- SPACING REDUCED --- */}
                     <p
                         className={`text-sm font-semibold mb-1 ${
-                            // Kept mb-1
                             ruleColorClasses[data.rule] || "text-gray-800"
                         }`}
                     >
-                        Rule {data.rule}: {ruleDescriptions[data.rule] || ""}{" "}
+                        Rule {data.rule}: {ruleDescriptions[data.rule] || ""}
                     </p>
                     <p className="text-sm text-gray-900 mb-2">
-                        {data.suggestion}{" "}
+                        {data.suggestion}
                     </p>
                     <div className="mt-2 pt-2 border-t border-gray-200 flex justify-end">
-                        {" "}
-                        {/* Reduced mt-3 pt-3 to mt-2 pt-2 */}{" "}
                         {isResolved ? (
                             <button
-                                onClick={() => unresolveHandler(data.id)}
+                                // Call the handler which will unresolve AND close
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    unresolveHandlerWithClose(data.id);
+                                }}
                                 className="text-xs font-medium text-yellow-600 hover:text-yellow-800 focus:outline-none focus:underline"
                             >
-                                {" "}
-                                Mark as Unresolved{" "}
+                                Mark as Unresolved
                             </button>
                         ) : (
                             <button
-                                onClick={() => resolveHandler(data.id)}
+                                // Call the handler which will resolve AND close
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    resolveHandlerWithClose(data.id);
+                                }}
                                 className="text-xs font-medium text-green-600 hover:text-green-800 focus:outline-none focus:underline"
                             >
-                                {" "}
-                                Mark as Resolved{" "}
+                                Mark as Resolved
                             </button>
-                        )}{" "}
+                        )}
                     </div>
-                    {/* --- END SPACING REDUCTION --- */}
                 </>
             );
         };
 
+        // Pass the original handlers (handleResolve, handleUnresolve) to renderHighlightedText
+        // renderHighlightedText will wrap them with the close() call internally
         return renderHighlightedText(
             inputText,
             orwellAnalysis,
             resolvedIds,
-            handleResolve,
-            handleUnresolve,
+            handleResolve, // Original handler
+            handleUnresolve, // Original handler
             getHighlightClass,
-            renderPopoverContent
+            renderPopoverContent // The function defined above
         );
     }, [
         inputText,
         orwellAnalysis,
-        renderHighlightedText,
+        renderHighlightedText, // Stable due to useCallback([])
         resolvedIds,
-        handleResolve,
-        handleUnresolve,
+        handleResolve, // Stable due to useCallback([])
+        handleUnresolve, // Stable due to useCallback([])
     ]);
 
-    // --- Memoized General Output (UPDATED content spacing) ---
+    // --- Memoized General Output (UPDATED TO PASS HANDLERS WITH CLOSE) ---
     const renderedGeneralOutput = useMemo(() => {
-        if (!inputText && !generalAnalysis) {
-            return null;
-        } // Handled by conditional render later
-        if (!generalAnalysis) return null; // Handled by conditional render later
+        if (!inputText && !generalAnalysis) return null;
+        if (!generalAnalysis) return null;
         if (generalAnalysis.length === 0) {
             return (
                 <p className="text-sky-700 bg-sky-50 border border-sky-200 rounded-md p-4 text-center font-medium mt-4">
-                    {" "}
                     Good work! No specific improvement suggestions found in this
-                    pass.{" "}
+                    pass.
                 </p>
             );
         }
 
-        // FIX: Removed unused 'item' parameter
+        // General highlight class (consistent purple)
         const getHighlightClass = (): string => {
             return "bg-purple-200 hover:bg-purple-300 text-purple-900";
         };
+
         const renderPopoverContent = (
             item: OrwellAnalysisResult | GeneralAnalysisResult,
             isResolved: boolean,
-            resolveHandler: (id: string) => void,
-            unresolveHandler: (id: string) => void
+            // These handlers already include close()
+            resolveHandlerWithClose: (id: string) => void,
+            unresolveHandlerWithClose: (id: string) => void
         ): React.ReactNode => {
             const data = item as GeneralAnalysisResult;
             return (
                 <>
-                    {/* --- SPACING REDUCED --- */}
                     <p className="text-sm font-semibold mb-1 text-purple-700">
-                        Category: {data.category}{" "}
+                        Category: {data.category}
                     </p>
                     <p className="text-sm text-gray-900 mb-2">
-                        {data.feedback}{" "}
+                        {data.feedback}
                     </p>
                     <div className="mt-2 pt-2 border-t border-gray-200 flex justify-end">
-                        {" "}
-                        {/* Reduced mt-3 pt-3 to mt-2 pt-2 */}{" "}
                         {isResolved ? (
                             <button
-                                onClick={() => unresolveHandler(data.id)}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    unresolveHandlerWithClose(data.id);
+                                }}
                                 className="text-xs font-medium text-yellow-600 hover:text-yellow-800 focus:outline-none focus:underline"
                             >
-                                {" "}
-                                Mark as Unresolved{" "}
+                                Mark as Unresolved
                             </button>
                         ) : (
                             <button
-                                onClick={() => resolveHandler(data.id)}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    resolveHandlerWithClose(data.id);
+                                }}
                                 className="text-xs font-medium text-green-600 hover:text-green-800 focus:outline-none focus:underline"
                             >
-                                {" "}
-                                Mark as Resolved{" "}
+                                Mark as Resolved
                             </button>
-                        )}{" "}
+                        )}
                     </div>
-                    {/* --- END SPACING REDUCTION --- */}
                 </>
             );
         };
 
+        // Pass original handlers to renderHighlightedText
         return renderHighlightedText(
             inputText,
             generalAnalysis,
             resolvedIds,
-            handleResolve,
-            handleUnresolve,
-            getHighlightClass,
-            renderPopoverContent
+            handleResolve, // Original handler
+            handleUnresolve, // Original handler
+            getHighlightClass, // General highlight class
+            renderPopoverContent // Popover content function
         );
     }, [
         inputText,
         generalAnalysis,
-        renderHighlightedText,
+        renderHighlightedText, // Stable
         resolvedIds,
-        handleResolve,
-        handleUnresolve,
+        handleResolve, // Stable
+        handleUnresolve, // Stable
     ]);
 
     // --- Loading/Error Components (Keep as before) ---
@@ -535,7 +573,6 @@ export default function Home() {
             fill="none"
             viewBox="0 0 24 24"
         >
-            {" "}
             <circle
                 className="opacity-25"
                 cx="12"
@@ -543,12 +580,12 @@ export default function Home() {
                 r="10"
                 stroke="currentColor"
                 strokeWidth="4"
-            ></circle>{" "}
+            ></circle>
             <path
                 className="opacity-75"
                 fill="currentColor"
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>{" "}
+            ></path>
         </svg>
     );
     const ErrorMessage = ({
@@ -561,42 +598,37 @@ export default function Home() {
         if (!message) return null;
         return (
             <div className="my-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg shadow-sm">
-                {" "}
                 <p className="font-semibold flex items-center">
-                    {" "}
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-5 w-5 mr-2 text-red-600"
                         viewBox="0 0 20 20"
                         fill="currentColor"
                     >
-                        {" "}
                         <path
                             fillRule="evenodd"
                             d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
                             clipRule="evenodd"
-                        />{" "}
-                    </svg>{" "}
-                    {title}{" "}
-                </p>{" "}
-                <p className="mt-1 ml-7 text-sm">{message}</p>{" "}
+                        />
+                    </svg>
+                    {title}
+                </p>
+                <p className="mt-1 ml-7 text-sm">{message}</p>
             </div>
         );
     };
 
-    // --- JSX Structure (Keep as before) ---
+    // --- JSX Structure (Keep as before, but Analysis Output uses updated render logic) ---
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8">
             {/* Header */}
             <header className="text-center mb-10 w-full max-w-4xl">
                 <h1 className="text-4xl font-bold text-gray-800 mb-2 tracking-tight">
-                    {" "}
-                    Writing Feedback Assistant{" "}
+                    Writing Feedback Assistant
                 </h1>
                 <p className="text-lg text-gray-600">
-                    {" "}
                     Refine your text with Orwell&apos;s rules and general
-                    feedback.{" "}
+                    feedback.
                 </p>
             </header>
             {/* Main Content Card */}
@@ -607,12 +639,11 @@ export default function Home() {
                         htmlFor="text-input"
                         className="block text-sm font-medium text-gray-700 mb-1"
                     >
-                        {" "}
-                        Paste your text here:{" "}
+                        Paste your text here:
                     </label>
                     <textarea
                         id="text-input"
-                        rows={10} // Slightly reduced rows
+                        rows={10}
                         className="w-full p-4 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out text-gray-900 placeholder:text-gray-400 text-base leading-relaxed"
                         placeholder="Enter text here..."
                         value={inputText}
@@ -622,8 +653,6 @@ export default function Home() {
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row justify-center gap-4 mb-6">
-                    {" "}
-                    {/* Reduced mb */}
                     <button
                         onClick={handleOrwellAnalyze}
                         disabled={isOrwellLoading || isGeneralLoading}
@@ -631,15 +660,14 @@ export default function Home() {
                             isOrwellLoading
                                 ? "bg-gray-400 cursor-not-allowed"
                                 : isGeneralLoading
-                                ? "bg-indigo-300 cursor-not-allowed"
+                                ? "bg-indigo-300 cursor-not-allowed" // Dim if other is loading
                                 : "bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                         } transition duration-150 ease-in-out`}
                     >
-                        {" "}
-                        {isOrwellLoading && <LoadingSpinner />}{" "}
+                        {isOrwellLoading && <LoadingSpinner />}
                         {isOrwellLoading
                             ? "Analyzing Orwell..."
-                            : "Analyze Orwell Rules"}{" "}
+                            : "Analyze Orwell Rules"}
                     </button>
                     <button
                         onClick={handleGeneralAnalyze}
@@ -648,15 +676,14 @@ export default function Home() {
                             isGeneralLoading
                                 ? "bg-gray-400 cursor-not-allowed"
                                 : isOrwellLoading
-                                ? "bg-purple-300 cursor-not-allowed"
+                                ? "bg-purple-300 cursor-not-allowed" // Dim if other is loading
                                 : "bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                         } transition duration-150 ease-in-out`}
                     >
-                        {" "}
-                        {isGeneralLoading && <LoadingSpinner />}{" "}
+                        {isGeneralLoading && <LoadingSpinner />}
                         {isGeneralLoading
                             ? "Analyzing Style..."
-                            : "Analyze General Feedback"}{" "}
+                            : "Analyze General Feedback"}
                     </button>
                 </div>
 
@@ -687,7 +714,6 @@ export default function Home() {
                                 }`}
                             >
                                 Orwell Rules Analysis
-                                {/* Optional: Show count if data exists */}
                                 {orwellAnalysis &&
                                     orwellAnalysis.length > 0 &&
                                     ` (${orwellAnalysis.length})`}
@@ -696,12 +722,11 @@ export default function Home() {
                                 onClick={() => setActiveAnalysisView("general")}
                                 className={`whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm focus:outline-none ${
                                     activeAnalysisView === "general"
-                                        ? "border-purple-500 text-purple-600" // Purple accent for general tab
+                                        ? "border-purple-500 text-purple-600"
                                         : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                                 }`}
                             >
                                 General Writing Feedback
-                                {/* Optional: Show count if data exists */}
                                 {generalAnalysis &&
                                     generalAnalysis.length > 0 &&
                                     ` (${generalAnalysis.length})`}
@@ -722,11 +747,13 @@ export default function Home() {
                                 )}
                                 {!isOrwellLoading &&
                                     !orwellError && ( // Only show content if not loading and no error
+                                        // Use prose for styling, whitespace-pre-wrap for line breaks
                                         <div className="prose prose-indigo max-w-none text-gray-800 leading-relaxed whitespace-pre-wrap text-base">
                                             {renderedOrwellOutput}
-                                            {/* Initial state message if no analysis run yet */}
+                                            {/* Initial state message */}
                                             {inputText &&
-                                                orwellAnalysis === null && (
+                                                orwellAnalysis === null &&
+                                                !orwellError && (
                                                     <p className="text-gray-500 italic text-center mt-4">
                                                         Click &quot;Analyze
                                                         Orwell Rules&quot; to
@@ -758,9 +785,10 @@ export default function Home() {
                                     !generalError && ( // Only show content if not loading and no error
                                         <div className="prose prose-purple max-w-none text-gray-800 leading-relaxed whitespace-pre-wrap text-base">
                                             {renderedGeneralOutput}
-                                            {/* Initial state message if no analysis run yet */}
+                                            {/* Initial state message */}
                                             {inputText &&
-                                                generalAnalysis === null && (
+                                                generalAnalysis === null &&
+                                                !generalError && (
                                                     <p className="text-gray-500 italic text-center mt-4">
                                                         Click &quot;Analyze
                                                         General Feedback&quot;
@@ -792,17 +820,17 @@ export default function Home() {
                     <li>
                         Never use a metaphor, simile, or other figure of speech
                         which you are used to seeing in print.
-                    </li>{" "}
-                    <li>Never use a long word where a short one will do.</li>{" "}
+                    </li>
+                    <li>Never use a long word where a short one will do.</li>
                     <li>
                         If it is possible to cut a word out, always cut it out.
-                    </li>{" "}
-                    <li>Never use the passive where you can use the active.</li>{" "}
+                    </li>
+                    <li>Never use the passive where you can use the active.</li>
                     <li>
                         Never use a foreign phrase, a scientific word, or a
                         jargon word if you can think of an everyday English
                         equivalent.
-                    </li>{" "}
+                    </li>
                     <li>
                         Break any of these rules sooner than say anything
                         outright barbarous.
@@ -813,13 +841,12 @@ export default function Home() {
             <footer className="text-center mt-12 text-gray-500 text-sm">
                 Powered by{" "}
                 <a
-                    href="https://deepmind.google/technologies/gemini/"
+                    href="https://deepmind.google/technologies/gemini/" // Example link
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-indigo-600 hover:underline"
                 >
-                    {" "}
-                    Google Gemini{" "}
+                    Google Gemini
                 </a>
                 .
             </footer>

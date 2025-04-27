@@ -289,8 +289,7 @@ export default function Home() {
                             key={`${itemData.id}-${index}`}
                             className="relative inline-block"
                         >
-                            {/* FIX: Prefixed unused variables with '_' */}
-                            {({ open: _open, close: _close }) => (
+                            {() => (
                                 <>
                                     <Popover.Button
                                         as="span"
@@ -355,8 +354,8 @@ export default function Home() {
         if (orwellAnalysis.length === 0) {
             return (
                 <p className="text-green-700 bg-green-50 border border-green-200 rounded-md p-4 text-center font-medium mt-4">
-                    {/* FIX: Escaped apostrophe */}
-                    Excellent! No violations of Orwell's rules 1-5 detected.{" "}
+                    Excellent! No violations of Orwell&apos;s rules 1-5
+                    detected.{" "}
                 </p>
             );
         }
@@ -596,8 +595,8 @@ export default function Home() {
                 </h1>
                 <p className="text-lg text-gray-600">
                     {" "}
-                    {/* FIX: Escaped apostrophe */}
-                    Refine your text with Orwell's rules and general feedback.{" "}
+                    Refine your text with Orwell&apos;s rules and general
+                    feedback.{" "}
                 </p>
             </header>
             {/* Main Content Card */}
@@ -729,17 +728,16 @@ export default function Home() {
                                             {inputText &&
                                                 orwellAnalysis === null && (
                                                     <p className="text-gray-500 italic text-center mt-4">
-                                                        {/* FIX: Escaped quotes */}
-                                                        Click "Analyze Orwell
-                                                        Rules" to see
-                                                        suggestions.
+                                                        Click &quot;Analyze
+                                                        Orwell Rules&quot; to
+                                                        see suggestions.
                                                     </p>
                                                 )}
                                             {!inputText && (
                                                 <p className="text-gray-500 italic text-center mt-4">
-                                                    {/* FIX: Escaped quotes */}
                                                     Enter text and click
-                                                    "Analyze Orwell Rules".
+                                                    &quot;Analyze Orwell
+                                                    Rules&quot;.
                                                 </p>
                                             )}
                                         </div>
@@ -764,17 +762,16 @@ export default function Home() {
                                             {inputText &&
                                                 generalAnalysis === null && (
                                                     <p className="text-gray-500 italic text-center mt-4">
-                                                        {/* FIX: Escaped quotes */}
-                                                        Click "Analyze General
-                                                        Feedback" to see
-                                                        suggestions.
+                                                        Click &quot;Analyze
+                                                        General Feedback&quot;
+                                                        to see suggestions.
                                                     </p>
                                                 )}
                                             {!inputText && (
                                                 <p className="text-gray-500 italic text-center mt-4">
-                                                    {/* FIX: Escaped quotes */}
                                                     Enter text and click
-                                                    "Analyze General Feedback".
+                                                    &quot;Analyze General
+                                                    Feedback&quot;.
                                                 </p>
                                             )}
                                         </div>
@@ -789,8 +786,7 @@ export default function Home() {
             {/* Rules Reference */}
             <div className="w-full max-w-4xl mt-8 p-4 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
                 <h3 className="font-semibold mb-2">
-                    {/* FIX: Escaped apostrophe */}
-                    Orwell's Rules Reference:
+                    Orwell&apos;s Rules Reference:
                 </h3>
                 <ol className="list-decimal list-inside space-y-1 text-xs sm:text-sm">
                     <li>
